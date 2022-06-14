@@ -3,7 +3,6 @@ const cors = require('cors')
 require('dotenv').config()
 const db = require("./models")
 const ethers = require('ethers')
-const { id } = require("ethers/lib/utils")
 const app = express()
 const PORT = process.env.PORT || 3000
 
@@ -52,7 +51,6 @@ db.sequelize.sync({ force: true }).then(async () => {
     //below code checks the newly created blocks 
     setInterval(async () => {
         try {
-            let hasValidTransaction = 0
             let processCount = 0
             currBlockNo = parseInt(await provider.getBlockNumber())
             console.log("exact", currBlockNo)
@@ -64,7 +62,7 @@ db.sequelize.sync({ force: true }).then(async () => {
                 let block = await provider.getBlockWithTransactions(currBlockNo)
                 // console.log("transactions", JSON.stringify(block.transactions))
                 if (block.transactions.length) {
-                    Promise.all(
+                    await Promise.all(
                         block.transactions.map(async (transaction) => {
                             let validAddress = await db.Address.findOne({
                                 where: {
@@ -79,19 +77,17 @@ db.sequelize.sync({ force: true }).then(async () => {
                                     amount: transaction.value.toBigInt(),
                                     timestamp: block.timestamp
                                 })
-                                processCount++
-                                hasValidTransaction = 1
                             }
-
-                            await db.Block.create({
-                                block_hash: block.hash,
-                                parent_hash: block.parentHash,
-                                timestamp: block.timestamp,
-                                process: processCount
-                            })
+                            processCount++
                         })
                     )
                 }
+                await db.Block.create({
+                    block_hash: block.hash,
+                    parent_hash: block.parentHash,
+                    timestamp: block.timestamp,
+                    process: processCount
+                })
             }
             prevBlockNo = currBlockNo
         }

@@ -15,11 +15,12 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.STRING,
         },
         amount: {
-            type: DataTypes.STRING,
+            type: DataTypes.BIGINT,
         },
         timestamp: {
-            type: DataTypes.STRING,
+            type: DataTypes.DATE,
         }
     })
     return Transaction;
 }
+
