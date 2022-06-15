@@ -11,7 +11,7 @@ app.use(express.json())
 
 
 //connecting to the db.
-db.sequelize.sync({ force: true }).then(async () => {
+db.sequelize.sync().then(async () => {
     app.listen(PORT, () => {
         console.log(`Server is listening on ${PORT}`)
     })
@@ -21,7 +21,6 @@ db.sequelize.sync({ force: true }).then(async () => {
 
     //hdwallet
     let hdWallet = ethers.utils.HDNode.fromMnemonic(process.env.mnemonic_key)
-    console.log("privateKey", hdWallet.privateKey)
 
     //creating 100 addresses
     let promises = []
@@ -47,20 +46,28 @@ db.sequelize.sync({ force: true }).then(async () => {
 
     console.log(hdWallet)
     let currBlockNo, prevBlockNo
+    let lastBlockRecorded = await db.Block.findOne({
+        limit: 1,
+        order: [['createdAt', 'DESC']]
+    })
+    if (lastBlockRecorded) {
+        let getLastBlock = await provider.getBlock(lastBlockRecorded.block_hash)
+        if (getLastBlock.number +1 < parseInt(await provider.getBlockNumber())) {
+            currBlockNo = parseInt(getLastBlock.number) + 1
+        }
+    }
+
 
     //below code checks the newly created blocks 
-    setInterval(async () => {
+     setInterval(async () => {
         try {
             let processCount = 0
-            currBlockNo = parseInt(await provider.getBlockNumber())
-            console.log("exact", currBlockNo)
+            if (!currBlockNo) {
+                currBlockNo = parseInt(await provider.getBlockNumber())
+            }
             if (currBlockNo !== prevBlockNo) {
-                if (currBlockNo - prevBlockNo > 1) {
-                    currBlockNo = prevBlockNo + 1
-                }
                 console.log("currBlockNo", currBlockNo, "prevBlockNo", prevBlockNo)
                 let block = await provider.getBlockWithTransactions(currBlockNo)
-                // console.log("transactions", JSON.stringify(block.transactions))
                 if (block.transactions.length) {
                     await Promise.all(
                         block.transactions.map(async (transaction) => {
@@ -90,6 +97,9 @@ db.sequelize.sync({ force: true }).then(async () => {
                 })
             }
             prevBlockNo = currBlockNo
+            if (currBlockNo + 1 < parseInt(await provider.getBlockNumber())) {
+                currBlockNo += 1
+            }
         }
         catch (error) {
             throw new Error(error.message)
